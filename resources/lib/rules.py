@@ -12,6 +12,7 @@ else:
 __addon__        = xbmcaddon.Addon()
 __addonid__      = __addon__.getAddonInfo('id').decode( 'utf-8' )
 __addonversion__ = __addon__.getAddonInfo('version')
+__addonname__    = __addon__.getAddonInfo('name').decode("utf-8")
 __language__     = __addon__.getLocalizedString
 __cwd__          = __addon__.getAddonInfo('path').decode("utf-8")
 __defaultpath__  = xbmc.translatePath( os.path.join( __cwd__, 'resources' ).encode("utf-8") ).decode("utf-8")
