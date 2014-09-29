@@ -87,7 +87,7 @@ msgid "Add to main menu"
 msgstr ""
 
 msgctxt "#30107"
-msgid "Browse"
+msgid "Browse for value"
 msgstr ""
 
 # Empty strings with IDs 30108 to 30199

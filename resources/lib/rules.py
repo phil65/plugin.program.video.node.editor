@@ -117,11 +117,15 @@ class RuleFunctions():
                         if not ( translated[ 2 ][ 0 ] ) == "|NONE|":
                             listitem = xbmcgui.ListItem( label="%s" % ( translated[ 2 ][ 1 ] ) )
                             action = "plugin://plugin.program.video.node.editor?type=editValue&actionPath=" + actionPath + "&rule=" + str( ruleCount )
+                            xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
                             
                             # Check if this match type can be browsed
                             if self.canBrowse( translated[ 0 ][ 1 ], content ):
-                                listitem.addContextMenuItems( [(__language__(30107), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=browseValue&actionPath=" + actionPath + "&rule=" + str( ruleCount ) + "&match=" + translated[ 0 ][ 1 ] + "&content=" + content + ")" )], replaceItems = True )
-                            xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
+                                #listitem.addContextMenuItems( [(__language__(30107), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=browseValue&actionPath=" + actionPath + "&rule=" + str( ruleCount ) + "&match=" + translated[ 0 ][ 1 ] + "&content=" + content + ")" )], replaceItems = True )
+                                listitem = xbmcgui.ListItem( label=__language__(30107) )
+                                action = "plugin://plugin.program.video.node.editor?type=browseValue&actionPath=" + actionPath + "&rule=" + str( ruleCount ) + "&match=" + translated[ 0 ][ 1 ] + "&content=" + content
+                                xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
+                            
                             
                             #self.browse( translated[ 0 ][ 1 ], content )
                         
