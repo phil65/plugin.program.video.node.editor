@@ -468,10 +468,10 @@ class RuleFunctions():
                             else:
                                 translated = self.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "" ] )
 
-                            if originalRule[ 0 ][ 1 ] == translated[ 0 ][ 1 ] and originalRule[ 1 ][ 0 ] == translated[ 1 ][ 0 ] and originalRule[ 2 ][ 0 ] == translated[ 2 ][ 0 ]:
+                            if originalRule[ 0 ][ 1 ] == translated[ 0 ][ 1 ] and originalRule[ 1 ][ 2 ] == translated[ 1 ][ 2 ] and originalRule[ 2 ][ 0 ] == translated[ 2 ][ 0 ]:
                                 # This is the right rule, update it
                                 rule.set( "field", newRule[ 0 ][ 1 ] )
-                                rule.set( "operator", newRule[ 1 ][ 0 ] )
+                                rule.set( "operator", newRule[ 1 ][ 2 ] )
                                 if value is not None:
                                     value.text = newRule[ 2 ][ 0 ]
                                 else:
@@ -511,7 +511,7 @@ class RuleFunctions():
                             else:
                                 translated = self.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "" ] )
 
-                            if originalRule[ 0 ][ 1 ] == translated[ 0 ][ 1 ] and originalRule[ 1 ][ 0 ] == translated[ 1 ][ 0 ] and originalRule[ 2 ][ 0 ] == translated[ 2 ][ 0 ]:
+                            if originalRule[ 0 ][ 1 ] == translated[ 0 ][ 1 ] and originalRule[ 1 ][ 2 ] == translated[ 1 ][ 2 ] and originalRule[ 2 ][ 0 ] == translated[ 2 ][ 0 ]:
                                 # This is the right rule, delete it
                                 root.remove( rule )
                                 break
@@ -540,7 +540,7 @@ class RuleFunctions():
         # Compare the passed in rule with those in self.nodeRules
         count = 0
         for nodeRule in self.nodeRules:
-            if nodeRule[0] == viewRule[0][1] and nodeRule[1] == viewRule[1][0] and nodeRule[2] == viewRule[2][0]:
+            if nodeRule[0] == viewRule[0][1] and nodeRule[1] == viewRule[1][2] and nodeRule[2] == viewRule[2][0]:
                 # Rule matches
                 self.nodeRules.pop( count )
                 return True
@@ -583,7 +583,7 @@ class RuleFunctions():
                             translated = self.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "" ] )
                             
                         # Save the rule
-                        self.nodeRules.append( [ translated[0][1], translated[1][0], translated[2][0] ] )
+                        self.nodeRules.append( [ translated[0][1], translated[1][2], translated[2][0] ] )
             except:
                 print_exc()
                 

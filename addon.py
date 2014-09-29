@@ -52,14 +52,7 @@ class Main:
             xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
             return
             
-        if "actionPath" in self.PARAMS:
-            log( "ACTIONPATH: " + repr( self.PARAMS[ "actionPath" ] ) )
-        if "path" in self.PARAMS:
-            log( "PATH: " + repr( self.PARAMS[ "path" ] ) )
-            
         if "type" in self.PARAMS:
-            log( "### Type parameter passed" )
-            log( repr( self.PARAMS ) )
             # We're performing a specific action
             if self.PARAMS[ "type" ] == "delete":
                 message = __language__( 30401 )
@@ -217,7 +210,6 @@ class Main:
                 RULE.editValue( self.PARAMS[ "actionPath" ], self.PARAMS[ "rule" ] )
             if self.PARAMS[ "type" ] == "browseValue":
                 # Browse for the new value of a rule
-                log( "### Trying to browse" )
                 RULE.browse( self.PARAMS[ "actionPath" ], self.PARAMS[ "rule" ], self.PARAMS[ "match" ], self.PARAMS[ "content" ] )
                 
             if self.PARAMS[ "type" ] == "newRule":
@@ -396,8 +388,6 @@ class Main:
                 # 2 = Path
                 # 3 = Type
                 # 4 = Order
-                
-                log( nodes[ key ][ 2 ] )
                 
                 # Localize the label
                 if nodes[ key ][ 0 ].isdigit():
