@@ -2,6 +2,7 @@
 import os, sys, shutil
 import xbmc, xbmcaddon, xbmcplugin, xbmcgui, xbmcvfs
 import xml.etree.ElementTree as xmltree
+import urllib
 from urlparse import parse_qs
 from traceback import print_exc
 
@@ -50,6 +51,11 @@ class Main:
             print_exc
             xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
             return
+            
+        if "actionPath" in self.PARAMS:
+            log( "ACTIONPATH: " + repr( self.PARAMS[ "actionPath" ] ) )
+        if "path" in self.PARAMS:
+            log( "PATH: " + repr( self.PARAMS[ "path" ] ) )
             
         if "type" in self.PARAMS:
             log( "### Type parameter passed" )
@@ -281,6 +287,7 @@ class Main:
             hasLimit = False
             hasPath = False
             rulecount = 0
+            self.PATH = urllib.quote( self.PATH )
             if rules is not None:
                 for rule in rules:
                     commands = []
@@ -380,6 +387,8 @@ class Main:
                 self.listNodes( self.PATH, nodes )
             else:
                 self.listNodes( targetDir, nodes )
+                
+            self.PATH = urllib.quote( self.PATH )
             
             for key in nodes:
                 # 0 = Label
@@ -387,6 +396,8 @@ class Main:
                 # 2 = Path
                 # 3 = Type
                 # 4 = Order
+                
+                log( nodes[ key ][ 2 ] )
                 
                 # Localize the label
                 if nodes[ key ][ 0 ].isdigit():
@@ -430,7 +441,7 @@ class Main:
                     
             if self.PATH != "":
                 # Get any rules from the index.xml
-                rules = self.getRules( os.path.join( self.PATH, "index.xml" ), True )
+                rules = self.getRules( os.path.join( urllib.unquote( self.PATH ), "index.xml" ), True )
                 rulecount = 0
                 if rules is not None:
                     for rule in rules:
@@ -464,7 +475,7 @@ class Main:
             
             showReset = False
             if self.PATH == "":
-                self.PATH = targetDir
+                self.PATH = urllib.quote( targetDir )
                 showReset = True
             
             # New view and node
@@ -593,9 +604,9 @@ class Main:
             
             # Add it to our list of nodes
             if isFolder:
-                nodes[ int( index ) ] = [ label, icon, origFolder.decode( "utf-8" ), "folder", origIndex ]
+                nodes[ int( index ) ] = [ label, icon, urllib.quote( origFolder.decode( "utf-8" ) ), "folder", origIndex ]
             else:
-                nodes[ int( index ) ] = [ label, icon, file, "item", origIndex ]
+                nodes[ int( index ) ] = [ label, icon, urllib.quote( file ), "item", origIndex ]
         except:
             print_exc()
             

@@ -2,6 +2,7 @@
 import os, sys
 import xbmc, xbmcaddon, xbmcplugin, xbmcgui, xbmcvfs
 import xml.etree.ElementTree as xmltree
+import urllib
 from traceback import print_exc
 
 __addon__        = xbmcaddon.Addon()
@@ -69,6 +70,8 @@ class OrderByFunctions():
             # Load the xml file
             tree = xmltree.parse( actionPath )
             root = tree.getroot()
+            
+            actionPath = urllib.quote( actionPath )
             
             # Get the content type
             content = root.find( "content" ).text

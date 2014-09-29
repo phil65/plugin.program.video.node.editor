@@ -2,6 +2,7 @@
 import os, sys, shutil
 import xbmc, xbmcaddon, xbmcplugin, xbmcgui, xbmcvfs
 import xml.etree.ElementTree as xmltree
+import urllib
 from traceback import print_exc
 
 if sys.version_info < (2, 7):
@@ -80,6 +81,8 @@ class RuleFunctions():
             # Load the xml file
             tree = xmltree.parse( actionPath )
             root = tree.getroot()
+            
+            actionPath = urllib.quote( actionPath )
             
             # Get the content type
             content = root.find( "content" )

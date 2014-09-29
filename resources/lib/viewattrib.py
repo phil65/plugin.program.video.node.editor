@@ -2,6 +2,7 @@
 import os, sys
 import xbmc, xbmcaddon, xbmcplugin, xbmcgui, xbmcvfs
 import xml.etree.ElementTree as xmltree
+import urllib
 from traceback import print_exc
 
 __addon__        = xbmcaddon.Addon()
