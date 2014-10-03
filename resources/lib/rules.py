@@ -916,7 +916,6 @@ class RuleFunctions():
                 
     def moveNodeRuleToAppdata( self, path, actionPath ):
         #BETA2 ONLY CODE
-        return
         
         # This function will move any parent node rules out of the index.xml, and into the rules.xml file in the plugins appdata folder
         
@@ -933,7 +932,7 @@ class RuleFunctions():
         ruleNode = None
         if nodes is not None:
             for node in nodes:
-                if node.attrib.get( "path" ) == path:
+                if node.attrib.get( "name" ) == path:
                     ruleNode = node
                     break
         if ruleNode is None:
