@@ -45,28 +45,6 @@ class ViewAttribFunctions():
                 
         return None
         
-    def addContent( self, actionPath ):
-        # Load all the rules
-        rules = self._load_rules().getroot()
-        elem = rules.find( "content" ).find( "type" )
-        
-        try:
-            tree = xmltree.parse( actionPath )
-            root = tree.getroot()
-            
-            # Add a new content tag
-            newContent = xmltree.SubElement( root, "content" )
-            newContent.text = elem.text
-            
-            # Set view type to 'filter'
-            root.set( "type", "filter" )
-                                
-            # Save the file
-            self.indent( root )
-            tree.write( actionPath, encoding="UTF-8" )
-        except:
-            print_exc()
-        
     def editContent( self, actionPath, default ):
         # Load all the rules
         tree = self._load_rules().getroot()
@@ -104,32 +82,6 @@ class ViewAttribFunctions():
                 return xbmc.getLocalizedString( int( elem.find( "label" ).text ) )
                 
         return None
-        
-    def addGroup( self, actionPath, content ):
-        # Load all the rules
-        rules = self._load_rules().getroot()
-        
-        # Find the default grouping for this content
-        elems = rules.find( "groupings" ).findall( "grouping" )
-        for elem in elems:
-            checkContent = elem.find( content )
-            if checkContent is not None:
-                defaultGrouping = elem.attrib.get( "name" )
-                break
-        
-        try:
-            tree = xmltree.parse( actionPath )
-            root = tree.getroot()
-            
-            # Add a new group tag
-            newContent = xmltree.SubElement( root, "group" )
-            newContent.text = defaultGrouping
-                                
-            # Save the file
-            self.indent( root )
-            tree.write( actionPath, encoding="UTF-8" )
-        except:
-            print_exc()
         
     def editGroup( self, actionPath, content, default ):
         # Load all the rules
@@ -221,6 +173,7 @@ class ViewAttribFunctions():
         
     def writeUpdatedRule( self, actionPath, attrib, value ):
         # This function writes an updated match, operator or value to a rule
+        log( repr( attrib ) )
         try:
             # Load the xml file
             tree = xmltree.parse( actionPath )
@@ -228,6 +181,11 @@ class ViewAttribFunctions():
             
             # Find the attribute and update it
             elem = root.find( attrib )
+            
+            if elem is None:
+                # There's no existing attribute with this name, so create one
+                elem = xmltree.SubElement( root, attrib )
+            
             elem.text = value
                                 
             # Save the file

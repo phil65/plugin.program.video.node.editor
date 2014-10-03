@@ -71,13 +71,16 @@ class OrderByFunctions():
             tree = xmltree.parse( actionPath )
             root = tree.getroot()
             
-            actionPath = urllib.quote( actionPath )
-            
             # Get the content type
             content = root.find( "content" ).text
             
             # Get the order node
             orderby = root.find( "order" )
+            
+            if orderby is None:
+                # There is no orderby element, so add one
+                self.newOrderBy( tree, actionPath )
+                orderby = root.find( "order" )
             
             match = orderby.text
             
@@ -176,11 +179,11 @@ class OrderByFunctions():
             print_exc()
             
         
-    def newOrderBy( self, actionPath ):
+    def newOrderBy( self, tree, actionPath ):
         # This function adds a new OrderBy, with default match and direction
         try:
             # Load the xml file
-            tree = xmltree.parse( actionPath )
+            #tree = xmltree.parse( actionPath )
             root = tree.getroot()
             
             # Get the content type
@@ -216,7 +219,7 @@ class OrderByFunctions():
                                 
             # Save the file
             self.indent( root )
-            tree.write( actionPath, encoding="UTF-8" )
+            tree.write( urllib.unquote( actionPath ), encoding="UTF-8" )
         except:
             print_exc()
             

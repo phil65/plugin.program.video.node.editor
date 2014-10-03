@@ -17,6 +17,7 @@ __addonname__    = __addon__.getAddonInfo('name').decode("utf-8")
 __language__     = __addon__.getLocalizedString
 __cwd__          = __addon__.getAddonInfo('path').decode("utf-8")
 __defaultpath__  = xbmc.translatePath( os.path.join( __cwd__, 'resources' ).encode("utf-8") ).decode("utf-8")
+__datapath__     = os.path.join( xbmc.translatePath( "special://profile/" ).decode( 'utf-8' ), "addon_data", __addonid__ )
 
 def log(txt):
     if isinstance (txt,str):
@@ -77,12 +78,17 @@ class RuleFunctions():
         return [ [ match, rule[ 0 ] ], [ operator, group, rule[ 1 ] ], [ rule[ 2 ], rule[ 2 ] ] ]
         
     def displayRule( self, actionPath, path, ruleNum ):
+        if actionPath.endswith( "index.xml" ):
+            # If this is a parent node, call alternative function
+            self.displayNodeRule( actionPath, ruleNum )
+            return
+            
         try:
             # Load the xml file
             tree = xmltree.parse( actionPath )
             root = tree.getroot()
             
-            actionPath = urllib.quote( actionPath )
+            actionPath = actionPath
             
             # Get the content type
             content = root.find( "content" )
@@ -94,6 +100,12 @@ class RuleFunctions():
             # Get all the rules
             ruleCount = 0
             rules = root.findall( "rule" )
+            
+            if len( rules ) == int( ruleNum ):
+                # This rule doesn't exist - create it
+                self.newRule( tree, urllib.unquote( actionPath ) )
+                rules = root.findall( "rule" )
+                
             if rules is not None:
                 for rule in rules:
                     if str( ruleCount ) == ruleNum:
@@ -138,6 +150,7 @@ class RuleFunctions():
             print_exc()
         
     def editMatch( self, actionPath, ruleNum, content, default ):
+        log( actionPath )
         # Load all operator groups
         tree = self._load_rules().getroot()
         elems = tree.find( "matches" ).findall( "match" )
@@ -196,29 +209,59 @@ class RuleFunctions():
         # Because we can't always pass the current value through the uri, we first need
         # to retrieve it, and the operator data type
         try:
-            # Load the xml file
-            tree = xmltree.parse( actionPath )
-            root = tree.getroot()
-            
-            # Get all the rules
-            ruleCount = 0
-            rules = root.findall( "rule" )
-            if rules is not None:
-                for rule in rules:
-                    if str( ruleCount ) == ruleNum:
-                        # This is the rule we'll be updating
-                        
-                        # Get the current value
-                        curValue = rule.find( "value" )
-                        if curValue is None:
-                            curValue = ""
-                        else:
-                            curValue = curValue.text
+            if actionPath.endswith( "index.xml" ):
+                log( "Loading from rules.xml" )
+                ( filePath, fileName ) = os.path.split( actionPath )
+                # Load the rules.xml
+                tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
+                log( "Loaded rules.xml" )
+                root = tree.getroot()
+                nodes = root.findall( "node" )
+                for node in nodes:
+                    log( node.attrib.get( "name" ) + " : " + filePath )
+                    if node.attrib.get( "name" ) == filePath:
+                        log( "Found the node" )
+                        rules = node.findall( "rule" )
+                        ruleCount = 0
+                        for rule in rules:
+                            log( str( ruleCount ) + " : " + ruleNum )
+                            if ruleCount == int( ruleNum ):
+                                log( "Found the rule" )
+                                # This is the rule we'll be updating
+                                # Get the current value
+                                curValue = rule.find( "value" )
+                                if curValue is None:
+                                    curValue = ""
+                                else:
+                                    curValue = curValue.text
+                                    
+                                match = rule.attrib.get( "field" )
+                                operator = rule.attrib.get( "operator" )
+                            ruleCount += 1
+            else:
+                # Load the xml file
+                tree = xmltree.parse( actionPath )
+                root = tree.getroot()
+                
+                # Get all the rules
+                ruleCount = 0
+                rules = root.findall( "rule" )
+                if rules is not None:
+                    for rule in rules:
+                        if str( ruleCount ) == ruleNum:
+                            # This is the rule we'll be updating
                             
-                        match = rule.attrib.get( "field" )
-                        operator = rule.attrib.get( "operator" )
+                            # Get the current value
+                            curValue = rule.find( "value" )
+                            if curValue is None:
+                                curValue = ""
+                            else:
+                                curValue = curValue.text
+                                
+                            match = rule.attrib.get( "field" )
+                            operator = rule.attrib.get( "operator" )
 
-                    ruleCount = ruleCount + 1
+                        ruleCount = ruleCount + 1
                         
             # Now, use the match value to get the group of operators this
             # comes from (this will tell us the data type in all types
@@ -256,6 +299,13 @@ class RuleFunctions():
             
     def writeUpdatedRule( self, actionPath, ruleNum, match = None, operator = None, value = None ):
         # This function writes an updated match, operator or value to a rule
+        
+        if actionPath.endswith( "index.xml" ):
+            # This is a parent node rule, so call the relevant function
+            #( filePath, fileName ) = os.path.split( actionPath )
+            #self.editNodeRule( filePath, originalRule, translated )
+            self.editNodeRule( actionPath, ruleNum, match, operator, value )
+            return
         try:
             # Load the xml file
             tree = xmltree.parse( actionPath )
@@ -270,18 +320,6 @@ class RuleFunctions():
                         # This is the rule we're updating
                         valueElem = rule.find( "value" )
                         
-                        # Get the original rule
-                        if actionPath.endswith( "index.xml" ):
-                            origMatch = rule.attrib.get( "field" )
-                            origOperator = rule.attrib.get( "operator" )
-                            if valueElem is None:
-                                origValue = ""
-                            else:
-                                origValue = valueElem.text
-                                
-                            originalRule = self.translateRule( [ origMatch, origOperator, origValue ] )
-                        
-                        # Get the updated rule
                         if match is None:
                             match = rule.attrib.get( "field" )
                         if operator is None:
@@ -314,18 +352,14 @@ class RuleFunctions():
             self.indent( root )
             tree.write( actionPath, encoding="UTF-8" )
             
-            # Update the other files in the directory
-            if actionPath.endswith( "index.xml" ):
-                ( filePath, fileName ) = os.path.split( actionPath )
-                self.editNodeRule( filePath, originalRule, translated )
         except:
             print_exc()
             
-    def newRule( self, actionPath ):
+    def newRule( self, tree, actionPath ):
         # This function adds a new rule, with default match and operator, no value
         try:
             # Load the xml file
-            tree = xmltree.parse( actionPath )
+            # tree = xmltree.parse( actionPath )
             root = tree.getroot()
             
             # Get the content type
@@ -379,6 +413,12 @@ class RuleFunctions():
         if not result:
             return
             
+        if actionPath.endswith( "index.xml" ):
+            # This is a parent node rule, so call the relevant function
+            #( filePath, fileName ) = os.path.split( actionPath )
+            #self.deleteNodeRule( filePath, originalRule )
+            self.deleteNodeRule( actionPath, ruleNum )
+            
         try:
             # Load the xml file
             tree = xmltree.parse( actionPath )
@@ -412,23 +452,160 @@ class RuleFunctions():
             # Save the file
             self.indent( root )
             tree.write( actionPath, encoding="UTF-8" )
-            
-            if actionPath.endswith( "index.xml" ):
-                ( filePath, fileName ) = os.path.split( actionPath )
-                self.deleteNodeRule( filePath, originalRule )
         
         except:
             print_exc()
             
     
     # Functions for managing rules in all views
-    def addNodeRule( self, actionPath, newRule ):
-        dirs, files = xbmcvfs.listdir( actionPath )
+    
+    def displayNodeRule( self, actionPath, ruleNum ):
+        log( repr( actionPath ) )
+        # This function will load and display a parent node rule
+        # (and create one, if the ruleNum specified doesn't exist)
+        
+        log( "Trying to display node rule " + ruleNum )
+        
+        # Split the actionPath, to make things easier
+        ( filePath, fileName ) = os.path.split( actionPath )
+        
+        try:
+            # Load the rules.xml file
+            tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
+            root = tree.getroot()
+            
+            # Find the relevant node
+            nodes = root.findall( "node" )
+            if nodes is None:
+                self.newNodeRule( actionPath, ruleNum )
+                return
+            ruleNode = None
+            for node in nodes:
+                if node.attrib.get( "name" ) == filePath:
+                    ruleNode = node
+                    break
+            if ruleNode == None:
+                log( "Couldn't find the correct <node>" )
+                self.newNodeRule( actionPath, ruleNum )
+                return
+                
+            # Find the relevant rule
+            rules = node.findall( "rule" )
+            if rules is None or len( rules ) == int( ruleNum ):
+                log( "No rules, or this ruleNum not specified" )
+                self.newNodeRule( actionPath, ruleNum )
+                return
+            ruleCount = 0
+            for rule in rules:
+                if ruleCount == int( ruleNum ):
+                    value = rule.find( "value" )
+                    if value is None:
+                        value = ""
+                    else:
+                        value = value.text
+                        
+                    translated = self.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), value ] )
+                    
+                    actionPath = urllib.quote( actionPath )
+                    
+                    # Rule to change match
+                    listitem = xbmcgui.ListItem( label="%s" % ( translated[ 0 ][ 0 ] ) )
+                    action = "plugin://plugin.program.video.node.editor?type=editMatch&actionPath=" + actionPath + "&default=" + translated[ 0 ][ 1 ] + "&rule=" + str( ruleCount ) + "&content=NONE"
+                    xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
+
+                    listitem = xbmcgui.ListItem( label="%s" % ( translated[ 1 ][ 0 ] ) )
+                    action = "plugin://plugin.program.video.node.editor?type=editOperator&actionPath=" + actionPath + "&group=" + translated[ 1 ][ 1 ] + "&default=" + translated[ 1 ][ 2 ] + "&rule=" + str( ruleCount )
+                    xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
+                    
+                    if not ( translated[ 2 ][ 0 ] ) == "|NONE|":
+                        listitem = xbmcgui.ListItem( label="%s" % ( translated[ 2 ][ 1 ] ) )
+                        action = "plugin://plugin.program.video.node.editor?type=editValue&actionPath=" + actionPath + "&rule=" + str( ruleCount )
+                        xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
+                        
+                        # Check if this match type can be browsed
+                        if self.canBrowse( translated[ 0 ][ 1 ] ):
+                            #listitem.addContextMenuItems( [(__language__(30107), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=browseValue&actionPath=" + actionPath + "&rule=" + str( ruleCount ) + "&match=" + translated[ 0 ][ 1 ] + "&content=" + content + ")" )], replaceItems = True )
+                            listitem = xbmcgui.ListItem( label=__language__(30107) )
+                            action = "plugin://plugin.program.video.node.editor?type=browseValue&actionPath=" + actionPath + "&rule=" + str( ruleCount ) + "&match=" + translated[ 0 ][ 1 ] + "&content=NONE"
+                            xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
+                        
+                        
+                        #self.browse( translated[ 0 ][ 1 ], content )
+                    
+                    xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+                    
+                    return
+                ruleCount += 1
+        except:
+            print_exc()
+            log( "No rules.xml file" )
+            self.newNodeRule( actionPath, ruleNum )
+            return
+            
+    def newNodeRule( self, actionPath, ruleNum ):
+        log( "Adding new node rule" )
+        # This function creates a new node rule, then re-calls the displayNodeRule function
+        
+        # Split the actionPath, to make things easier
+        ( filePath, fileName ) = os.path.split( actionPath )
+        
+        # Open the rules.xml file if it exists, else create it
+        if xbmcvfs.exists( os.path.join( __datapath__, "rules.xml" ) ):
+            tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
+            root = tree.getroot()
+        else:
+            tree = xmltree.ElementTree( xmltree.Element( "rules" ) )
+            root = tree.getroot()
+            
+        # See if we already have a element for the node we're parsing
+        nodes = root.findall( "node" )
+        ruleNode = None
+        if nodes is not None:
+            for node in nodes:
+                log( repr( node.attrib.get( "name" ) ) + " : " + repr( filePath ) )
+                if node.attrib.get( "name" ) == filePath:
+                    ruleNode = node
+                    break
+        if ruleNode is None:
+            # We couldn't find an existing element for the node we're parsing - so create one
+            log( "Couldn't find existing <node>" )
+            ruleNode = xmltree.SubElement( root, "node" )
+            ruleNode.set( "name", filePath )
+            
+        # Create a new rule
+        ruleTree = self._load_rules().getroot()
+        elems = ruleTree.find( "matches" ).findall( "match" )
+        match = "title"
+        for elem in elems:
+            # We've found the first match for this type
+            match = elem.attrib.get( "name" )
+            operator = elem.find( "operator" ).text
+            break
+                
+        # Find the default operator for this match
+        elems = ruleTree.find( "operators" ).findall( "group" )
+        for elem in elems:
+            if elem.attrib.get( "name" ) == operator:
+                operator = elem.find( "operator" ).text
+                break
+                
+        # Write the new rule
+        newRule = xmltree.SubElement( ruleNode, "rule" )
+        newRule.set( "field", match )
+        newRule.set( "operator", operator )
+        xmltree.SubElement( newRule, "value" )                               
+        
+        # Save the file
+        self.indent( root )
+        tree.write( os.path.join( __datapath__, "rules.xml" ), encoding="UTF-8" )
+        
+        # Now add the rule to all views within the node
+        dirs, files = xbmcvfs.listdir( filePath )
         for file in files:
             if file == "index.xml":
                 continue
             elif file.endswith( ".xml" ):
-                filename = os.path.join( actionPath, file )
+                filename = os.path.join( filePath, file )
                 
                 try:
                     # Load the xml file
@@ -436,25 +613,88 @@ class RuleFunctions():
                     root = tree.getroot()
                     
                     rule = xmltree.SubElement( root, "rule" )
-                    rule.set( "field", newRule[ 0 ][ 1 ] )
-                    rule.set( "operator", newRule[ 1 ][ 0 ] )
-                    xmltree.SubElement( rule, "value" ).text = newRule[ 2 ][ 0 ]
+                    rule.set( "field", match )
+                    rule.set( "operator", operator )
+                    xmltree.SubElement( rule, "value" )
                     
                     # Save the file
                     self.indent( root )
                     tree.write( filename, encoding="UTF-8" )
                 except:
                     print_exc()
+        
+        # Re-call the displayNodeRule function
+        self.displayNodeRule( actionPath, ruleNum )
+        
+                
+    #def editNodeRule( self, actionPath, originalRule, newRule ):
+    def editNodeRule( self, actionPath, ruleNum, match, operator, value ):
+        ( filePath, fileName ) = os.path.split( actionPath )
+        
+        # Update the rule in rules.xml
+        try:
+            tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
+            root = tree.getroot()
+            nodes = root.findall( "node" )
+            for node in nodes:
+                if node.attrib.get( "name" ) == filePath:
+                    ruleCount = 0
+                    rules = node.findall( "rule" )
+                    for rule in rules:
+                        if ruleCount == int( ruleNum ):
+                            # This is the rule we want to update
+                            valueElem = rule.find( "value" )
+                            if match is None:
+                                match = rule.attrib.get( "field" )
+                            if operator is None:
+                                operator = rule.attrib.get( "operator" )
+                                
+                            if value is None:
+                                if valueElem is None:
+                                    value = ""
+                                else:
+                                    value = valueElem.text
+                                    
+                            if value is None:
+                                value = ""
+                                    
+                            newRule = self.translateRule( [ match, operator, value ] )
+                            
+                            # Get the original rule
+                            origMatch = rule.attrib.get( "field" )
+                            origOperator = rule.attrib.get( "operator" )
+                            if valueElem is None:
+                                origValue = ""
+                            else:
+                                origValue = valueElem.text
+                                
+                            originalRule = self.translateRule( [ origMatch, origOperator, origValue ] )
+                            
+                            # Update the rule
+                            rule.set( "field", newRule[ 0 ][ 1 ] )
+                            rule.set( "operator", newRule[ 1 ][ 2 ] )
+                            if len( newRule ) == 3:
+                                if rule.find( "value" ) == None:
+                                    # Create a new rule node
+                                    xmltree.SubElement( rule, "value" ).text = newRule[ 2 ][ 0 ]
+                                else:
+                                    rule.find( "value" ).text = newRule[ 2 ][ 0 ]
+                                    
+                        ruleCount += 1
+                        # Save the file
+            self.indent( root )
+            tree.write( os.path.join( __datapath__, "rules.xml" ), encoding="UTF-8" )
+        except:
+            print_exc()
+            return
 
-                
-                
-    def editNodeRule( self, actionPath, originalRule, newRule ):
-        dirs, files = xbmcvfs.listdir( actionPath )
+        # Now update the views with the new rule
+        dirs, files = xbmcvfs.listdir( filePath )
         for file in files:
             if file == "index.xml":
                 continue
             elif file.endswith( ".xml" ):
-                filename = os.path.join( actionPath, file )
+                filename = os.path.join( filePath, file )
                 
                 # List the rules
                 try:
@@ -491,13 +731,51 @@ class RuleFunctions():
     
                 
                 
-    def deleteNodeRule( self, actionPath, originalRule ):
-        dirs, files = xbmcvfs.listdir( actionPath )
+    #def deleteNodeRule( self, actionPath, originalRule ):
+    def deleteNodeRule( self, actionPath, ruleNum ):
+        ( filePath, fileName ) = os.path.split( actionPath )
+        # Delete the rule from rules.xml
+        try:
+            tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
+            root = tree.getroot()
+            nodes = root.findall( "node" )
+            for node in nodes:
+                if node.attrib.get( "name" ) == filePath:
+                    ruleCount = 0
+                    rules = node.findall( "rule" )
+                    for rule in rules:
+                        if ruleCount == int( ruleNum ):
+                            # This is the rule we want to delete
+                            # Translate the rule, so we can delete it from the views
+                            valueElem = rule.find( "value" )
+                            origMatch = rule.attrib.get( "field" )
+                            origOperator = rule.attrib.get( "operator" )
+                            if valueElem is None:
+                                origValue = ""
+                            else:
+                                origValue = valueElem.text
+                                
+                            originalRule = self.translateRule( [ origMatch, origOperator, origValue ] )
+                            
+                            node.remove( rule )
+                            
+                        ruleCount += 1
+                        
+            # Save the file
+            self.indent( root )
+            tree.write( os.path.join( __datapath__, "rules.xml" ), encoding="UTF-8" )
+            
+        except:
+            print_exc()
+            return
+        
+        # Now delete the rule from all the views
+        dirs, files = xbmcvfs.listdir( filePath )
         for file in files:
             if file == "index.xml":
                 continue
             elif file.endswith( ".xml" ):
-                filename = os.path.join( actionPath, file )
+                filename = os.path.join( filePath, file )
                 
                 # List the rules
                 try:
@@ -526,6 +804,22 @@ class RuleFunctions():
                     
                 except:
                     print_exc()
+                    
+    def deleteAllNodeRules( self, actionPath ):
+        try:
+            # Remove all rules for this parent node from the rules.xml
+            tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
+            root = tree.getroot()
+            nodes = root.findall( "node" )
+            for node in nodes:
+                if node.attrib.get( "name" ) == actionPath:
+                    root.remove( node )
+                    
+            # Write the updated file
+            self.indent( root )
+            tree.write( os.path.join( __datapath__, "rules.xml" ), encoding="UTF-8" )
+        except:
+            print_exc()
                     
     def isNodeRule( self, viewRule, actionPath ):
         if actionPath.endswith( "index.xml" ):
@@ -564,20 +858,48 @@ class RuleFunctions():
             rule.set( "field", nodeRule[ 0 ] )
             rule.set( "operator", nodeRule[ 1 ] )
             xmltree.SubElement( rule, "value" ).text = nodeRule[ 2 ]
+            
+    def getNodeRules( self, actionPath ):
+        ( filePath, fileName ) = os.path.split( actionPath )
+        if self.nodeRules is None:
+            self.loadNodeRules( filePath )
+        if len( self.nodeRules ) == 0:
+            return None
+        else:
+            return self.nodeRules
     
     def loadNodeRules( self, actionPath ):
-        log( "Loading node rules" )
+        log( "### Loading node rules" )
         self.nodeRules = []
         # Load all the node rules for current directory
-        actionPath = os.path.join( actionPath, "index.xml" )
-        if xbmcvfs.exists( actionPath ):
+        #actionPath = os.path.join( actionPath, "index.xml" )
+        filename = os.path.join( __datapath__, "rules.xml" )
+        if xbmcvfs.exists( filename ):
             try:
                 # Load the xml file
-                tree = xmltree.parse( actionPath )
+                tree = xmltree.parse( filename )
                 root = tree.getroot()
                 
+                # Find the node element for this path
+                nodes = root.findall( "node" )
+                if nodes is None:
+                    log( "### No nodes" )
+                    return
+                
+                ruleNode = None
+                for node in nodes:
+                    log( "### " + node.attrib.get( "name" ) + " : " + actionPath )
+                    if node.attrib.get( "name" ) == actionPath:
+                        ruleNode = node
+                        log( "### Matched" )
+                        break
+                        
+                if ruleNode is None:
+                    # There don't appear to be any rules
+                    return
+                
                 # Look for any rules
-                rules = root.findall( "rule" )
+                rules = ruleNode.findall( "rule" )
                 if rules is not None:
                     for rule in rules:
                         value = rule.find( "value" )
@@ -587,11 +909,67 @@ class RuleFunctions():
                             translated = self.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "" ] )
                             
                         # Save the rule
+                        log( "### Added a rule" )
                         self.nodeRules.append( [ translated[0][1], translated[1][2], translated[2][0] ] )
             except:
                 print_exc()
                 
-                
+    def moveNodeRuleToAppdata( self, path, actionPath ):
+        #BETA2 ONLY CODE
+        return
+        
+        # This function will move any parent node rules out of the index.xml, and into the rules.xml file in the plugins appdata folder
+        
+        # Open the rules.xml file if it exists, else create it
+        if xbmcvfs.exists( os.path.join( __datapath__, "rules.xml" ) ):
+            ruleTree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
+            ruleRoot = ruleTree.getroot()
+        else:
+            ruleTree = xmltree.ElementTree( xmltree.Element( "rules" ) )
+            ruleRoot = ruleTree.getroot()
+            
+        # See if we already have a element for the node we're parsing
+        nodes = ruleRoot.findall( "node" )
+        ruleNode = None
+        if nodes is not None:
+            for node in nodes:
+                if node.attrib.get( "path" ) == path:
+                    ruleNode = node
+                    break
+        if ruleNode is None:
+            # We couldn't find an existing element for the node we're parsing - so create one
+            ruleNode = xmltree.SubElement( ruleRoot, "node" )
+            ruleNode.set( "name", path )
+            
+        try:
+            tree = xmltree.parse( actionPath )
+            root = tree.getroot()
+            
+            rules = root.findall( "rule" )
+            if rules is not None:
+                for rule in rules:
+                    # Create a new rule in the ruleTree
+                    newRule = xmltree.SubElement( ruleNode, "rule" )
+                    newRule.set( "field", rule.attrib.get( "field" ) )
+                    newRule.set( "operator", rule.attrib.get( "operator" ) )
+                    value = rule.find( "value" )
+                    if value is not None:
+                        xmltree.SubElement( newRule, "value" ).text = value.text
+                        
+                    # Delete the rule from the tree
+                    root.remove( rule )
+            
+            # Write both files
+            self.indent( root )
+            tree.write( actionPath, encoding="UTF-8" )
+            self.indent( ruleRoot )
+            ruleTree.write( os.path.join( __datapath__, "rules.xml" ), encoding="UTF-8" )
+            
+        except:
+            print_exc()
+        
+        #/BETA2 ONLY CODE
+    
     # Functions for browsing for value
     def canBrowse( self, match, content = None ):
         # Check whether the match type allows browsing
@@ -727,10 +1105,12 @@ class RuleFunctions():
             returnVal = self.browserPlaylist( self.niceMatchName( match ) )
                 
         try:
-            log( "Selected: " + repr( returnVal ) )
-            self.writeUpdatedRule( actionPath, ruleNum, value = returnVal.decode( "utf-8" ) )
+            # Delete any fake node
+            xbmcvfs.delete( os.path.join( xbmc.translatePath( "special://profile".decode('utf-8') ), "library", "video", "plugin.program.video.node.editor", "temp.xml" ) )
         except:
-            return
+            print_exc()
+            
+        self.writeUpdatedRule( actionPath, ruleNum, value = returnVal.decode( "utf-8" ) )
             
     def niceMatchName( self, match ):
         # This function retrieves the translated label for a given match
@@ -764,16 +1144,11 @@ class RuleFunctions():
         self.indent( root )
         tree.write( os.path.join( targetDir, "temp.xml" ), encoding="UTF-8" )
         
-    def deleteBrowseNode( self ):
-        # Delete the fake node we used for browsing - not currently used as it breaks things
-        shutil.rmtree( os.path.join( xbmc.translatePath( "special://profile".decode('utf-8') ), "library", "video", "plugin.program.video.node.editor" ) )
-        
     def browser( self, title ):
         # Browser instance used by majority of browses
         json_query = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "id": 0, "method": "Files.GetDirectory", "params": { "properties": ["title", "file", "thumbnail"], "directory": "library://video/plugin.program.video.node.editor/temp.xml", "media": "files" } }')
         json_query = unicode(json_query, 'utf-8', errors='ignore')
         json_response = simplejson.loads(json_query)
-        
         
         listings = []
         values = []
@@ -803,7 +1178,7 @@ class RuleFunctions():
         return values[ selectedItem ]
         
     def browserPlaylist( self, title ):
-        # Browser instance used by majority of browses
+        # Browser instance used by playlists
         json_query = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "id": 0, "method": "Files.GetDirectory", "params": { "properties": ["title", "file", "thumbnail"], "directory": "special://videoplaylists/", "media": "files" } }')
         json_query = unicode(json_query, 'utf-8', errors='ignore')
         json_response = simplejson.loads(json_query)

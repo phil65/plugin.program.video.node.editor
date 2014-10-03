@@ -1,8 +1,10 @@
 ﻿# coding=utf-8
-import os, sys, shutil
+import os, sys, shutil, unicodedata, re, types
+from htmlentitydefs import name2codepoint
 import xbmc, xbmcaddon, xbmcplugin, xbmcgui, xbmcvfs
 import xml.etree.ElementTree as xmltree
 import urllib
+from unidecode import unidecode
 from urlparse import parse_qs
 from traceback import print_exc
 
@@ -18,6 +20,7 @@ __language__     = __addon__.getLocalizedString
 __cwd__          = __addon__.getAddonInfo('path').decode("utf-8")
 __addonname__    = __addon__.getAddonInfo('name').decode("utf-8")
 __resource__     = xbmc.translatePath( os.path.join( __cwd__, 'resources', 'lib' ) ).decode("utf-8")
+__datapath__     = os.path.join( xbmc.translatePath( "special://profile/" ).decode( 'utf-8' ), "addon_data", __addonid__ )
 
 sys.path.append(__resource__)
 
@@ -25,6 +28,19 @@ import rules, viewattrib, orderby
 RULE = rules.RuleFunctions()
 ATTRIB = viewattrib.ViewAttribFunctions()
 ORDERBY = orderby.OrderByFunctions()
+
+# character entity reference
+CHAR_ENTITY_REXP = re.compile('&(%s);' % '|'.join(name2codepoint))
+
+# decimal character reference
+DECIMAL_REXP = re.compile('&#(\d+);')
+
+# hexadecimal character reference
+HEX_REXP = re.compile('&#x([\da-fA-F]+);')
+
+REPLACE1_REXP = re.compile(r'[\']+')
+REPLACE2_REXP = re.compile(r'[^-a-z0-9]+')
+REMOVE_REXP = re.compile('-{2,}')
 
 def log(txt):
 
@@ -52,6 +68,10 @@ class Main:
             xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
             return
             
+        # Create data if not exists
+        if not xbmcvfs.exists(__datapath__):
+            xbmcvfs.mkdir(__datapath__)
+            
         if "type" in self.PARAMS:
             # We're performing a specific action
             if self.PARAMS[ "type" ] == "delete":
@@ -66,6 +86,7 @@ class Main:
                         xbmcvfs.delete( self.PARAMS[ "actionPath" ] )
                     else:
                         # Delete folder
+                        RULE.deleteAllNodeRules( self.PARAMS[ "actionPath" ] )
                         shutil.rmtree( self.PARAMS[ "actionPath" ] )
                         
             if self.PARAMS[ "type" ] == "deletenode":
@@ -118,7 +139,7 @@ class Main:
                     newView = keyboard.getText().decode( "utf-8" )
                     if newView != "":
                         # Ensure filename is unique
-                        filename = newView.lower().replace( " ", "" )
+                        filename = self.slugify( newView.lower().replace( " ", "" ) )
                         if xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], filename + ".xml" ) ):
                             count = 0
                             while xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], filename + "-" + str( count ) + ".xml" ) ):
@@ -147,7 +168,7 @@ class Main:
                         return
                         
                     # Ensure foldername is unique
-                    foldername = newNode.lower().replace( " ", "" )
+                    foldername = self.slugify( newNode.lower().replace( " ", "" ) )
                     if xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], foldername + os.pathsep ) ):
                         count = 0
                         while xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], foldername + "-" + str( count ) + os.pathsep ) ):
@@ -200,6 +221,7 @@ class Main:
                 return
                     
             if self.PARAMS[ "type" ] == "editMatch":
+                log( repr( self.PARAMS[ "actionPath" ] ) )
                 # Editing the field the rule is matched against
                 RULE.editMatch( self.PARAMS[ "actionPath" ], self.PARAMS[ "rule" ], self.PARAMS[ "content"], self.PARAMS[ "default" ] )
             if self.PARAMS[ "type" ] == "editOperator":
@@ -212,9 +234,6 @@ class Main:
                 # Browse for the new value of a rule
                 RULE.browse( self.PARAMS[ "actionPath" ], self.PARAMS[ "rule" ], self.PARAMS[ "match" ], self.PARAMS[ "content" ] )
                 
-            if self.PARAMS[ "type" ] == "newRule":
-                # Create a new rule
-                RULE.newRule( self.PARAMS[ "actionPath" ] )
             if self.PARAMS[ "type" ] == "deleteRule":
                 # Delete a rule
                 RULE.deleteRule( self.PARAMS[ "actionPath" ], self.PARAMS[ "rule" ] )
@@ -230,26 +249,16 @@ class Main:
             if self.PARAMS[ "type" ] == "editOrderByDirection":
                 ORDERBY.editDirection( self.PARAMS[ "actionPath" ], self.PARAMS[ "default" ] )
                 
-            if self.PARAMS[ "type" ] == "addOrderBy":
-                # Create a new order by
-                ORDERBY.newOrderBy( self.PARAMS[ "actionPath" ] )
-                
             # --- Edit other attribute of view ---
             #  > Content
-            if self.PARAMS[ "type" ] == "addContent":
-                ATTRIB.addContent( self.PARAMS[ "actionPath" ] )
             if self.PARAMS[ "type" ] == "editContent":
                 ATTRIB.editContent( self.PARAMS[ "actionPath" ], "" ) # No default to pass, yet!
                 
             #  > Grouping
-            if self.PARAMS[ "type" ] == "addGroup":
-                ATTRIB.addGroup( self.PARAMS[ "actionPath" ], self.PARAMS[ "content" ] )
             if self.PARAMS[ "type" ] == "editGroup":
-                ATTRIB.editGroup( self.PARAMS[ "actionPath" ], self.PARAMS[ "content" ], self.PARAMS[ "value" ] )
+                ATTRIB.editGroup( self.PARAMS[ "actionPath" ], self.PARAMS[ "content" ], "" )
 
             #  > Limit
-            if self.PARAMS[ "type" ] == "addLimit":
-                ATTRIB.addLimit( self.PARAMS[ "actionPath" ] )
             if self.PARAMS[ "type" ] == "editLimit":
                 ATTRIB.editLimit( self.PARAMS[ "actionPath" ], self.PARAMS[ "value" ] )
                 
@@ -271,7 +280,7 @@ class Main:
             
         if self.PATH.endswith( ".xml" ):
             # List rules for specific view
-            rules = self.getRules( self.PATH )
+            rules, nextRule = self.getRules( self.PATH )
             hasContent = False
             content = ""
             hasOrder = False
@@ -279,7 +288,7 @@ class Main:
             hasLimit = False
             hasPath = False
             rulecount = 0
-            self.PATH = urllib.quote( self.PATH )
+            self.PATH = self.PATH
             if rules is not None:
                 for rule in rules:
                     commands = []
@@ -354,22 +363,22 @@ class Main:
                 
             if not hasContent and not hasPath:
                 # Add content
-                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=addContent&actionPath=" + self.PATH, xbmcgui.ListItem( label=__language__(30000) ) )
+                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=editContent&actionPath=" + self.PATH, xbmcgui.ListItem( label=__language__(30000) ) )
             if not hasOrder and hasContent:
                 # Add order
-                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=addOrderBy&actionPath=" + self.PATH, xbmcgui.ListItem( label=__language__(30002) ) )
+                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=orderby&actionPath=" + self.PATH, xbmcgui.ListItem( label=__language__(30002) ), isFolder=True )
             if not hasGroup and hasContent:
                 # Add group
-                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=addGroup&actionPath=" + self.PATH + "&content=" + content, xbmcgui.ListItem( label=__language__(30004) ) )              
+                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=editGroup&actionPath=" + self.PATH + "&content=" + content, xbmcgui.ListItem( label=__language__(30004) ) )              
             if not hasLimit and hasContent:
                 # Add limit
-                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=addLimit&actionPath=" + self.PATH, xbmcgui.ListItem( label=__language__(30003) ) )            
+                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=editLimit&actionPath=" + self.PATH + "&value=25", xbmcgui.ListItem( label=__language__(30003) ) )            
             if not hasPath and not hasContent:
                 # Add path
                 xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=addPath&actionPath=" + self.PATH, xbmcgui.ListItem( label=__language__(30001) ) )
             if hasContent:
                 # Add rule
-                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=newRule&actionPath=" + self.PATH, xbmcgui.ListItem( label=__language__(30005) ) )
+                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=rule&actionPath=" + self.PATH + "&rule=" + str( nextRule ), xbmcgui.ListItem( label=__language__(30005) ), isFolder = True )
                 
         else:
             # List nodes and views
@@ -381,6 +390,11 @@ class Main:
                 self.listNodes( targetDir, nodes )
                 
             self.PATH = urllib.quote( self.PATH )
+            
+            # Check whether we should show Add To Menu option
+            showAddToMenu = False
+            if xbmc.getCondVisibility( "Skin.HasSetting(SkinShortcuts-FullMenu)" ):
+                showAddToMenu = True
             
             for key in nodes:
                 # 0 = Label
@@ -414,6 +428,9 @@ class Main:
                 commandsNode.append( ( __language__(30105), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=editvisibility&actionPath=" + os.path.join( nodes[ key ][ 2 ], "index.xml" ) + ")" ) )
                 commandsNode.append( ( __language__(30100), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=delete&actionPath=" + nodes[ key ][ 2 ] + ")" ) )
                 
+                if showAddToMenu:
+                    commandsNode.append( ( __language__(30106), "XBMC.RunScript(script.skinshortcuts,type=addNode&options=" + urllib.unquote( nodes[ key ][ 2 ] ).replace( targetDir, "" ) + ")" ) )
+                
                 commandsView = []
                 commandsView.append( ( __language__(30101), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=editlabel&actionPath=" + nodes[ key ][ 2 ] + "&label=" + nodes[ key ][ 0 ] + ")" ) )
                 commandsView.append( ( __language__(30102), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=editIcon&actionPath=" + nodes[ key ][ 2 ] + "&value=" + nodes[ key ][ 1 ] + ")" ) )
@@ -431,7 +448,7 @@ class Main:
                     
             if self.PATH != "":
                 # Get any rules from the index.xml
-                rules = self.getRules( os.path.join( urllib.unquote( self.PATH ), "index.xml" ), True )
+                rules, nextRule = self.getRules( os.path.join( urllib.unquote( self.PATH ), "index.xml" ), True )
                 rulecount = 0
                 if rules is not None:
                     for rule in rules:
@@ -461,7 +478,7 @@ class Main:
                             xbmcplugin.addDirectoryItem( int(sys.argv[ 1 ]), action, listitem, isFolder=False )
                         
                 # New rule
-                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=newRule&actionPath=" + os.path.join( self.PATH, "index.xml" ), xbmcgui.ListItem( label=__language__(30005) ) )
+                xbmcplugin.addDirectoryItem( int( sys.argv[ 1 ] ), "plugin://plugin.program.video.node.editor?type=rule&actionPath=" + os.path.join( self.PATH, "index.xml" ) + "&rule=" + str( nextRule), xbmcgui.ListItem( label=__language__(30005) ), isFolder=True )
             
             showReset = False
             if self.PATH == "":
@@ -530,23 +547,39 @@ class Main:
                 if path is not None:
                     returnVal.append( ( "path", path.text ) )
                 
+            ruleNum = 0
+            
             # Look for any rules
-            rules = root.findall( "rule" )
-            if rules is not None:
-                ruleNum = 0
-                for rule in rules:
-                    value = rule.find( "value" )
-                    if value is not None and value.text is not None:
-                        translated = RULE.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), value.text ] )
-                        if not RULE.isNodeRule( translated, actionPath ):
-                            returnVal.append( ( "rule", rule.attrib.get( "field" ), rule.attrib.get( "operator" ), value.text, ruleNum ) )
-                    else:
-                        translated = RULE.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "" ] )
-                        if not RULE.isNodeRule( translated, actionPath ):
-                            returnVal.append( ( "rule", rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "", ruleNum ) )
-                    ruleNum += 1
+            if actionPath.endswith( "index.xml" ):
+                # Load the rules from RULE module
+                rules = RULE.getNodeRules( actionPath )
+                if rules is not None:
+                    for rule in rules:
+                        returnVal.append( ( "rule", rule[ 0 ], rule[ 1 ], rule[ 2 ], ruleNum ) )
+                        ruleNum += 1
+                    return returnVal, len( rules )
+                else:
+                    return returnVal, 0
+            else:
+                rules = root.findall( "rule" )
+                
+                # Process the rules
+                if rules is not None:
+                    for rule in rules:
+                        value = rule.find( "value" )
+                        if value is not None and value.text is not None:
+                            translated = RULE.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), value.text ] )
+                            if not RULE.isNodeRule( translated, actionPath ):
+                                returnVal.append( ( "rule", rule.attrib.get( "field" ), rule.attrib.get( "operator" ), value.text, ruleNum ) )
+                        else:
+                            translated = RULE.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "" ] )
+                            if not RULE.isNodeRule( translated, actionPath ):
+                                returnVal.append( ( "rule", rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "", ruleNum ) )
+                        ruleNum += 1
                     
-            return returnVal
+                    return returnVal, len( rules )
+                
+            return returnVal, 0
         except:
             print_exc()
         
@@ -560,6 +593,11 @@ class Main:
     def parseNode( self, node, nodes ):
         # If the folder we've been passed contains an index.xml, send that file to be processed
         if xbmcvfs.exists( os.path.join( node, "index.xml" ) ):
+        
+            # BETA2 ONLY CODE
+            RULE.moveNodeRuleToAppdata( node, os.path.join( node, "index.xml" ) )
+            # /BETA2 ONLY CODE
+            
             self.parseItem( os.path.join( node, "index.xml" ), nodes, True, node )
     
     def parseItem( self, file, nodes, isFolder = False, origFolder = None ):
@@ -596,7 +634,7 @@ class Main:
             if isFolder:
                 nodes[ int( index ) ] = [ label, icon, urllib.quote( origFolder.decode( "utf-8" ) ), "folder", origIndex ]
             else:
-                nodes[ int( index ) ] = [ label, icon, urllib.quote( file ), "item", origIndex ]
+                nodes[ int( index ) ] = [ label, icon, file, "item", origIndex ]
         except:
             print_exc()
             
@@ -708,6 +746,87 @@ class Main:
         else:
             if level and (not elem.tail or not elem.tail.strip()):
                 elem.tail = i
+                
+    # Slugify functions
+    def smart_truncate(string, max_length=0, word_boundaries=False, separator=' '):
+        string = string.strip(separator)
+
+        if not max_length:
+            return string
+
+        if len(string) < max_length:
+            return string
+
+        if not word_boundaries:
+            return string[:max_length].strip(separator)
+
+        if separator not in string:
+            return string[:max_length]
+
+        truncated = ''
+        for word in string.split(separator):
+            if word:
+                next_len = len(truncated) + len(word) + len(separator)
+                if next_len <= max_length:
+                    truncated += '{0}{1}'.format(word, separator)
+        if not truncated:
+            truncated = string[:max_length]
+        return truncated.strip(separator)
+
+    def slugify(self, text, entities=True, decimal=True, hexadecimal=True, max_length=0, word_boundary=False, separator='-', convertInteger=False):
+        # Handle integers
+        if convertInteger and text.isdigit():
+            text = "NUM-" + text
+    
+        # text to unicode
+        if type(text) != types.UnicodeType:
+            text = unicode(text, 'utf-8', 'ignore')
+
+        # decode unicode ( ??? = Ying Shi Ma)
+        text = unidecode(text)
+
+        # text back to unicode
+        if type(text) != types.UnicodeType:
+            text = unicode(text, 'utf-8', 'ignore')
+
+        # character entity reference
+        if entities:
+            text = CHAR_ENTITY_REXP.sub(lambda m: unichr(name2codepoint[m.group(1)]), text)
+
+        # decimal character reference
+        if decimal:
+            try:
+                text = DECIMAL_REXP.sub(lambda m: unichr(int(m.group(1))), text)
+            except:
+                pass
+
+        # hexadecimal character reference
+        if hexadecimal:
+            try:
+                text = HEX_REXP.sub(lambda m: unichr(int(m.group(1), 16)), text)
+            except:
+                pass
+
+        # translate
+        text = unicodedata.normalize('NFKD', text)
+        if sys.version_info < (3,):
+            text = text.encode('ascii', 'ignore')
+
+        # replace unwanted characters
+        text = REPLACE1_REXP.sub('', text.lower()) # replace ' with nothing instead with -
+        text = REPLACE2_REXP.sub('-', text.lower())
+
+        # remove redundant -
+        text = REMOVE_REXP.sub('-', text).strip('-')
+
+        # smart truncate if requested
+        if max_length > 0:
+            text = smart_truncate(text, max_length, word_boundary, '-')
+
+        if separator != '-':
+            text = text.replace('-', separator)
+
+        return text
                 
 
 if ( __name__ == "__main__" ):
