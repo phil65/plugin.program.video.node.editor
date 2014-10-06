@@ -1,10 +1,3 @@
-0.2.0 - Second beta release
- - Move parent node level rules into addon data directory
- - UX improvements for new rules and attribs
- - Skin Shortcuts integration (requires script.skinshortcuts 0.4.2)
- - Delete fake node used for browsing after browsing complete
- - Use script.module.unidecode to ensure file and folder names are parseable
- - Minor fixes
+1.0.0
 
-0.1.0
- - Initial beta release
+- First release
