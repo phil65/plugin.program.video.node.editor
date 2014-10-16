@@ -1109,7 +1109,10 @@ class RuleFunctions():
         except:
             print_exc()
             
-        self.writeUpdatedRule( actionPath, ruleNum, value = returnVal.decode( "utf-8" ) )
+        if returnVal is not None:
+            returnVal = returnVal.decode( "utf-8" )
+        
+        self.writeUpdatedRule( actionPath, ruleNum, value = returnVal )
             
     def niceMatchName( self, match ):
         # This function retrieves the translated label for a given match
