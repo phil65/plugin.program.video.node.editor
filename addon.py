@@ -57,7 +57,7 @@ class Main:
         # If there are no custom video nodes in the profile directory, copy them from the XBMC install
         targetDir = os.path.join( xbmc.translatePath( "special://profile".decode('utf-8') ), "library", "video" )
         try:
-            if not xbmcvfs.exists( targetDir ):
+            if not os.path.exists( targetDir ):
                 xbmcvfs.mkdirs( targetDir )
                 originDir = os.path.join( xbmc.translatePath( "special://xbmc".decode( "utf-8" ) ), "system", "library", "video" )
                 dirs, files = xbmcvfs.listdir( originDir )
@@ -69,7 +69,7 @@ class Main:
             return
             
         # Create data if not exists
-        if not xbmcvfs.exists(__datapath__):
+        if not os.path.exists(__datapath__):
             xbmcvfs.mkdir(__datapath__)
             
         if "type" in self.PARAMS:
@@ -140,9 +140,9 @@ class Main:
                     if newView != "":
                         # Ensure filename is unique
                         filename = self.slugify( newView.lower().replace( " ", "" ) )
-                        if xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], filename + ".xml" ) ):
+                        if os.path.exists( os.path.join( self.PARAMS[ "actionPath" ], filename + ".xml" ) ):
                             count = 0
-                            while xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], filename + "-" + str( count ) + ".xml" ) ):
+                            while os.path.exists( os.path.join( self.PARAMS[ "actionPath" ], filename + "-" + str( count ) + ".xml" ) ):
                                 count += 1
                             filename = filename + "-" + str( count )
                         
@@ -169,9 +169,9 @@ class Main:
                         
                     # Ensure foldername is unique
                     foldername = self.slugify( newNode.lower().replace( " ", "" ) )
-                    if xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], foldername + os.pathsep ) ):
+                    if os.path.exists( os.path.join( self.PARAMS[ "actionPath" ], foldername + os.pathsep ) ):
                         count = 0
-                        while xbmcvfs.exists( os.path.join( self.PARAMS[ "actionPath" ], foldername + "-" + str( count ) + os.pathsep ) ):
+                        while os.path.exists( os.path.join( self.PARAMS[ "actionPath" ], foldername + "-" + str( count ) + os.pathsep ) ):
                             count += 1
                         foldername = foldername + "-" + str( count )
                     foldername = os.path.join( self.PARAMS[ "actionPath" ], foldername )
@@ -429,7 +429,7 @@ class Main:
                 commandsNode.append( ( __language__(30100), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=delete&actionPath=" + nodes[ key ][ 2 ] + ")" ) )
                 
                 if showAddToMenu:
-                    commandsNode.append( ( __language__(30106), "XBMC.RunScript(script.skinshortcuts,type=addNode&options=" + urllib.unquote( nodes[ key ][ 2 ] ).replace( targetDir, "" ) + ")" ) )
+                    commandsNode.append( ( __language__(30106), "XBMC.RunScript(script.skinshortcuts,type=addNode&options=" + urllib.unquote( nodes[ key ][ 2 ] ).replace( targetDir, "" ) + "|" + urllib.quote( label ) + ")" ) )
                 
                 commandsView = []
                 commandsView.append( ( __language__(30101), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=editlabel&actionPath=" + nodes[ key ][ 2 ] + "&label=" + nodes[ key ][ 0 ] + ")" ) )
@@ -592,7 +592,7 @@ class Main:
         
     def parseNode( self, node, nodes ):
         # If the folder we've been passed contains an index.xml, send that file to be processed
-        if xbmcvfs.exists( os.path.join( node, "index.xml" ) ):
+        if os.path.exists( os.path.join( node, "index.xml" ) ):
         
             # BETA2 ONLY CODE
             RULE.moveNodeRuleToAppdata( node, os.path.join( node, "index.xml" ) )

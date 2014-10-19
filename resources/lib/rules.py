@@ -550,7 +550,7 @@ class RuleFunctions():
         ( filePath, fileName ) = os.path.split( actionPath )
         
         # Open the rules.xml file if it exists, else create it
-        if xbmcvfs.exists( os.path.join( __datapath__, "rules.xml" ) ):
+        if os.path.exists( os.path.join( __datapath__, "rules.xml" ) ):
             tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
             root = tree.getroot()
         else:
@@ -874,7 +874,7 @@ class RuleFunctions():
         # Load all the node rules for current directory
         #actionPath = os.path.join( actionPath, "index.xml" )
         filename = os.path.join( __datapath__, "rules.xml" )
-        if xbmcvfs.exists( filename ):
+        if os.path.exists( filename ):
             try:
                 # Load the xml file
                 tree = xmltree.parse( filename )
@@ -920,7 +920,7 @@ class RuleFunctions():
         # This function will move any parent node rules out of the index.xml, and into the rules.xml file in the plugins appdata folder
         
         # Open the rules.xml file if it exists, else create it
-        if xbmcvfs.exists( os.path.join( __datapath__, "rules.xml" ) ):
+        if os.path.exists( os.path.join( __datapath__, "rules.xml" ) ):
             ruleTree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
             ruleRoot = ruleTree.getroot()
         else:
@@ -1126,7 +1126,7 @@ class RuleFunctions():
     def createBrowseNode( self, content, grouping = None ):
         # This function creates a fake node which we'll use for browsing
         targetDir = os.path.join( xbmc.translatePath( "special://profile".decode('utf-8') ), "library", "video", "plugin.program.video.node.editor" )
-        if not xbmcvfs.exists( targetDir ):
+        if not os.path.exists( targetDir ):
             xbmcvfs.mkdirs( targetDir )
             
         # Create a new etree
