@@ -173,7 +173,6 @@ class ViewAttribFunctions():
         
     def writeUpdatedRule( self, actionPath, attrib, value ):
         # This function writes an updated match, operator or value to a rule
-        log( repr( attrib ) )
         try:
             # Load the xml file
             tree = xmltree.parse( actionPath )

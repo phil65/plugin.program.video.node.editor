@@ -150,7 +150,6 @@ class RuleFunctions():
             print_exc()
         
     def editMatch( self, actionPath, ruleNum, content, default ):
-        log( actionPath )
         # Load all operator groups
         tree = self._load_rules().getroot()
         elems = tree.find( "matches" ).findall( "match" )
@@ -210,23 +209,17 @@ class RuleFunctions():
         # to retrieve it, and the operator data type
         try:
             if actionPath.endswith( "index.xml" ):
-                log( "Loading from rules.xml" )
                 ( filePath, fileName ) = os.path.split( actionPath )
                 # Load the rules.xml
                 tree = xmltree.parse( os.path.join( __datapath__, "rules.xml" ) )
-                log( "Loaded rules.xml" )
                 root = tree.getroot()
                 nodes = root.findall( "node" )
                 for node in nodes:
-                    log( node.attrib.get( "name" ) + " : " + filePath )
                     if node.attrib.get( "name" ) == filePath:
-                        log( "Found the node" )
                         rules = node.findall( "rule" )
                         ruleCount = 0
                         for rule in rules:
-                            log( str( ruleCount ) + " : " + ruleNum )
                             if ruleCount == int( ruleNum ):
-                                log( "Found the rule" )
                                 # This is the rule we'll be updating
                                 # Get the current value
                                 curValue = rule.find( "value" )
@@ -460,11 +453,8 @@ class RuleFunctions():
     # Functions for managing rules in all views
     
     def displayNodeRule( self, actionPath, ruleNum ):
-        log( repr( actionPath ) )
         # This function will load and display a parent node rule
         # (and create one, if the ruleNum specified doesn't exist)
-        
-        log( "Trying to display node rule " + ruleNum )
         
         # Split the actionPath, to make things easier
         ( filePath, fileName ) = os.path.split( actionPath )
@@ -485,14 +475,12 @@ class RuleFunctions():
                     ruleNode = node
                     break
             if ruleNode == None:
-                log( "Couldn't find the correct <node>" )
                 self.newNodeRule( actionPath, ruleNum )
                 return
                 
             # Find the relevant rule
             rules = node.findall( "rule" )
             if rules is None or len( rules ) == int( ruleNum ):
-                log( "No rules, or this ruleNum not specified" )
                 self.newNodeRule( actionPath, ruleNum )
                 return
             ruleCount = 0
@@ -538,12 +526,10 @@ class RuleFunctions():
                 ruleCount += 1
         except:
             print_exc()
-            log( "No rules.xml file" )
             self.newNodeRule( actionPath, ruleNum )
             return
             
     def newNodeRule( self, actionPath, ruleNum ):
-        log( "Adding new node rule" )
         # This function creates a new node rule, then re-calls the displayNodeRule function
         
         # Split the actionPath, to make things easier
@@ -562,13 +548,11 @@ class RuleFunctions():
         ruleNode = None
         if nodes is not None:
             for node in nodes:
-                log( repr( node.attrib.get( "name" ) ) + " : " + repr( filePath ) )
                 if node.attrib.get( "name" ) == filePath:
                     ruleNode = node
                     break
         if ruleNode is None:
             # We couldn't find an existing element for the node we're parsing - so create one
-            log( "Couldn't find existing <node>" )
             ruleNode = xmltree.SubElement( root, "node" )
             ruleNode.set( "name", filePath )
             
@@ -869,7 +853,6 @@ class RuleFunctions():
             return self.nodeRules
     
     def loadNodeRules( self, actionPath ):
-        log( "### Loading node rules" )
         self.nodeRules = []
         # Load all the node rules for current directory
         #actionPath = os.path.join( actionPath, "index.xml" )
@@ -883,15 +866,12 @@ class RuleFunctions():
                 # Find the node element for this path
                 nodes = root.findall( "node" )
                 if nodes is None:
-                    log( "### No nodes" )
                     return
                 
                 ruleNode = None
                 for node in nodes:
-                    log( "### " + node.attrib.get( "name" ) + " : " + actionPath )
                     if node.attrib.get( "name" ) == actionPath:
                         ruleNode = node
-                        log( "### Matched" )
                         break
                         
                 if ruleNode is None:
@@ -909,7 +889,6 @@ class RuleFunctions():
                             translated = self.translateRule( [ rule.attrib.get( "field" ), rule.attrib.get( "operator" ), "" ] )
                             
                         # Save the rule
-                        log( "### Added a rule" )
                         self.nodeRules.append( [ translated[0][1], translated[1][2], translated[2][0] ] )
             except:
                 print_exc()
@@ -1028,7 +1007,6 @@ class RuleFunctions():
                         matchesValue.append( elem.text )
 
                 if len( matchesList ) == 0:
-                    log( "There are no valid content types for this match" )
                     return
                 if len( matchesList ) == 1:
                     # Only one returned, no point offering a choice of content type

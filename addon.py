@@ -221,7 +221,6 @@ class Main:
                 return
                     
             if self.PARAMS[ "type" ] == "editMatch":
-                log( repr( self.PARAMS[ "actionPath" ] ) )
                 # Editing the field the rule is matched against
                 RULE.editMatch( self.PARAMS[ "actionPath" ], self.PARAMS[ "rule" ], self.PARAMS[ "content"], self.PARAMS[ "default" ] )
             if self.PARAMS[ "type" ] == "editOperator":
