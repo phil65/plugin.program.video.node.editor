@@ -428,7 +428,7 @@ class Main:
                 commandsNode.append( ( __language__(30100), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=delete&actionPath=" + nodes[ key ][ 2 ] + ")" ) )
                 
                 if showAddToMenu:
-                    commandsNode.append( ( __language__(30106), "XBMC.RunScript(script.skinshortcuts,type=addNode&options=" + urllib.unquote( nodes[ key ][ 2 ] ).replace( targetDir, "" ) + "|" + urllib.quote( label.encode( "utf-8" ) ) + ")" ) )
+                    commandsNode.append( ( __language__(30106), "XBMC.RunScript(script.skinshortcuts,type=addNode&options=" + urllib.unquote( nodes[ key ][ 2 ] ).replace( targetDir, "" ) + "|" + urllib.quote( label.encode( "utf-8" ) ) + "|" + urllib.quote( nodes[ key ][ 1 ].encode( "utf-8" ) ) + ")" ) )
                 
                 commandsView = []
                 commandsView.append( ( __language__(30101), "XBMC.RunPlugin(plugin://plugin.program.video.node.editor?type=editlabel&actionPath=" + nodes[ key ][ 2 ] + "&label=" + nodes[ key ][ 0 ] + ")" ) )
