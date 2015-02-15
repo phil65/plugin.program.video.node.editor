@@ -93,8 +93,8 @@
 			<episodes>True</episodes>
 			<operator>boolean</operator>
 		</match>
-		<match name="genres">
-			<label>135</label>
+		<match name="genre">
+			<label>515</label>
 			<movies>True</movies>
 			<tvshows>True</tvshows>
 			<episodes>True</episodes>

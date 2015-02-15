@@ -1031,7 +1031,7 @@ class RuleFunctions():
             self.createBrowseNode( content, None )
             returnVal = self.browser( self.niceMatchName( match ) )
                 
-        if match == "genres":
+        if match == "genre":
             self.createBrowseNode( content, "genres" )
             returnVal = self.browser( self.niceMatchName( match ) )
                 
